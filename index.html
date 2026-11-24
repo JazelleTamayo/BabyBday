@@ -11,7 +11,7 @@
    =========================================================== */
 const CONFIG = {
   name:    "Baby",                       // 👈 HIS NAME (or nickname) goes here
-  message: "Happy 20th birthday! You're officially 20 now 🎉\nMay God bless you always, keep you healthy and guide every step you take.\nI pray you succeed in everything you dream of. I'm so proud of you and I'll always be here cheering you on ♥",   // 👈 YOUR MESSAGE (type \n where you want a new line)
+  message: "Happy 20th birthday! You're officially 20 now 🎉\nMay God bless you always, keep you healthy and guide every step you take.\nI pray you succeed in everything you dream of. I'm so proud of you and I'll always be here cheering you on ♥",   // 👉 YOUR MESSAGE (type \n where you want a new line)
   from:    "Love, me",                   // 👈 how you want to sign it
   caption: "Birthday Boy 🎂"              // 👈 text under his photo
 };
@@ -310,18 +310,23 @@ const CONFIG = {
   @media (prefers-reduced-motion:reduce){
     .floaty,.title .ch{animation-duration:.01s!important}
   }
+
+  .mute{position:fixed;top:max(12px,env(safe-area-inset-top));right:12px;z-index:70;width:44px;height:44px;border-radius:50%;
+    border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.1);color:#fff;font-size:20px;cursor:pointer;
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:none;place-items:center}
+  .mute.show{display:grid}
 </style>
 </head>
 <body>
 
 <!-- ============ STAGE 1: the envelope ============ -->
 <section class="env-stage" id="envStage">
-  <div class="intro script"><small>a little something for</small><span class="js-name">Babe</span> ♥</div>
+  <div class="intro script"><small>a little something for</small><span class="js-name">Baby</span> ♥</div>
 
   <div class="envelope" id="envelope" aria-label="Envelope. Slide the heart to open.">
     <div class="env-back"></div>
     <div class="letter">
-      <div class="to script">For <span class="js-name">Babe</span></div>
+      <div class="to script">For <span class="js-name">Baby</span></div>
       <div class="mini">open me ♥</div>
     </div>
     <div class="env-front"></div>
@@ -344,7 +349,7 @@ const CONFIG = {
     <h1 class="title" id="title" aria-label="Happy Birthday">
       <span class="word" data-text="Happy"></span>
       <span class="word" data-text="Birthday"></span>
-      <span class="name script"><span class="js-name">Babe</span>!</span>
+      <span class="name script"><span class="js-name">Baby</span>!</span>
     </h1>
 
     <div class="scene">
@@ -359,7 +364,7 @@ const CONFIG = {
           </div>
           <div class="face cover">
             <svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.3C.9 8.2 3 4.5 6.6 4.5c2.1 0 3.6 1.2 5.4 3.2 1.8-2 3.3-3.2 5.4-3.2 3.6 0 5.7 3.7 4.2 7.2C19.5 16.4 12 21 12 21z"/></svg>
-            <div class="to script">For <span class="js-name">Babe</span></div>
+            <div class="to script">For <span class="js-name">Baby</span></div>
             <div class="mini">open me ♥</div>
           </div>
         </div>
@@ -417,7 +422,7 @@ const CONFIG = {
 
     <div class="side">
       <div class="note">
-        <h2 class="script">Dear <span class="js-name">Babe</span>,</h2>
+        <h2 class="script">Dear <span class="js-name">Baby</span>,</h2>
         <p id="message"></p>
         <div class="from script" id="from"></div>
       </div>
@@ -427,6 +432,7 @@ const CONFIG = {
 </section>
 
 <canvas id="confetti"></canvas>
+<button class="mute" id="mute" aria-label="Toggle music">🔊</button>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -522,6 +528,61 @@ document.addEventListener('DOMContentLoaded', () => {
   // gentle nudge if he hasn't figured it out
   let idleNudge = setInterval(() => { if (!opened && p === 0) { knob.classList.remove('nudge'); void knob.offsetWidth; knob.classList.add('nudge'); } }, 4000);
 
+  
+  /* =================== HAPPY BIRTHDAY MUSIC (built in, no audio file) =================== */
+  const NOTE = {C3:130.81,F3:174.61,G3:196.0,G4:392.0,A4:440.0,B4:493.88,C5:523.25,D5:587.33,E5:659.25,F5:698.46,G5:783.99};
+  const MELODY = [
+    ['G4',.75],['G4',.25],['A4',1],['G4',1],['C5',1],['B4',2],
+    ['G4',.75],['G4',.25],['A4',1],['G4',1],['D5',1],['C5',2],
+    ['G4',.75],['G4',.25],['G5',1],['E5',1],['C5',1],['B4',1],['A4',2],
+    ['F5',.75],['F5',.25],['E5',1],['C5',1],['D5',1],['C5',2]
+  ];
+  const BASS = [['C3',3],['G3',3],['G3',3],['C3',3],['C3',3],['F3',4],['F3',3],['C3',3]];
+  const BEAT = 0.5, SONG_BEATS = 25;
+  let actx = null, master = null, musicOn = true, musicRunning = false, loopTimer = null;
+  const muteBtn = $('#mute');
+
+  function initAudio() {
+    if (!actx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      actx = new AC();
+      master = actx.createGain(); master.gain.value = 0.55; master.connect(actx.destination);
+    }
+    if (actx.state === 'suspended') actx.resume();
+  }
+  function tone(freq, when, dur, type, vol) {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(vol, when + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    o.connect(g); g.connect(master);
+    o.start(when); o.stop(when + dur + 0.05);
+  }
+  function playOnce() {
+    let t = actx.currentTime + 0.1;
+    MELODY.forEach(([n, b]) => { tone(NOTE[n], t, b * BEAT * 0.95, 'triangle', 0.32); tone(NOTE[n] * 2, t, b * BEAT * 0.6, 'sine', 0.06); t += b * BEAT; });
+    t = actx.currentTime + 0.1;
+    BASS.forEach(([n, b]) => { tone(NOTE[n], t, b * BEAT * 0.9, 'sine', 0.22); t += b * BEAT; });
+  }
+  function startMusic() {
+    if (!actx || musicRunning) return;
+    musicRunning = true; muteBtn.classList.add('show');
+    const loop = () => { if (!musicRunning) return; if (musicOn) playOnce(); loopTimer = setTimeout(loop, (SONG_BEATS + 2) * BEAT * 1000); };
+    loop();
+  }
+  function stopMusic() {
+    musicRunning = false; clearTimeout(loopTimer); muteBtn.classList.remove('show');
+    if (actx) { actx.close(); actx = null; }
+  }
+  muteBtn.addEventListener('click', () => {
+    musicOn = !musicOn; muteBtn.textContent = musicOn ? '🔊' : '🔇';
+    if (musicOn && musicRunning && actx) { clearTimeout(loopTimer); initAudio(); musicRunning = false; startMusic(); }
+    if (!musicOn && actx) { actx.close(); actx = null; musicRunning = false; clearTimeout(loopTimer); muteBtn.classList.add('show'); }
+  });
+  ['pointerdown', 'keydown'].forEach(ev => { knob.addEventListener(ev, initAudio); envelope.addEventListener(ev, initAudio); });
+
   /* =================== OPEN SEQUENCE =================== */
   let timers = [], floatTimer = null;
   const later = (fn, ms) => timers.push(setTimeout(fn, ms));
@@ -537,6 +598,7 @@ document.addEventListener('DOMContentLoaded', () => {
       requestAnimationFrame(() => requestAnimationFrame(() => popStage.classList.add('opened')));
     }, 1150);
     later(() => confettiBurst(), 1150 + 1900);
+    later(() => { initAudio(); if (musicOn) { musicRunning = false; startMusic(); } else { muteBtn.classList.add('show'); } }, 1150 + 1900);
     later(() => { floatTimer = setInterval(spawnFloaty, 650); for (let i = 0; i < 6; i++) setTimeout(spawnFloaty, i * 150); }, 1150 + 2200);
     later(() => popStage.classList.add('live'), 1150 + 3600);
   }
@@ -544,6 +606,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#replay').addEventListener('click', () => {
     timers.forEach(clearTimeout); timers = [];
     clearInterval(floatTimer);
+    stopMusic();
     document.querySelectorAll('.floaty').forEach(f => f.remove());
     popStage.classList.remove('show', 'opened', 'live');
     document.body.classList.add('no-anim');
